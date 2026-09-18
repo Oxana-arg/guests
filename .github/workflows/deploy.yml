@@ -1,8 +1,11 @@
 name: Публикация на GitHub Pages
 
+# Правило окружения github-pages пускает деплой только с дефолтной ветки
+# репозитория, поэтому здесь перечислены обе: как только дефолтной станет
+# main, вторую строку можно убрать.
 on:
   push:
-    branches: [main]
+    branches: [main, claude/peaceful-hypatia-47zlbe]
   workflow_dispatch:
 
 permissions:
