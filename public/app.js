@@ -160,9 +160,11 @@
     query: "",
     loaded: false,
     pending: 0,
+    rev: 0,
     signature: ""
   };
 
+  var lastActivity = Date.now();
   var $ = function (id) { return document.getElementById(id); };
   var els = {};
   var dark = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
@@ -227,12 +229,26 @@
     els.syncText.textContent = text;
   }
 
+  // Один служебный документ meta/settings хранит шаблон и счётчик версии rev.
+  // Опрос читает только его (1 чтение), а весь список тянется лишь когда rev
+  // изменился — иначе бесплатная квота Firestore (50 000 чтений в сутки)
+  // сгорала бы за пару часов от одной открытой вкладки.
+  async function readMeta() {
+    var docs = await fsList("meta");
+    var settings = null;
+    docs.forEach(function (d) { if (d.id === "settings") settings = d; });
+    return settings;
+  }
+
+  function revOf(settings) {
+    return settings && settings.rev != null ? settings.rev : 0;
+  }
+
   async function loadAll(silent) {
     try {
-      var results = await Promise.all([fsList("guests"), fsList("meta")]);
+      var results = await Promise.all([fsList("guests"), readMeta()]);
       var guests = results[0].map(normalizeGuest);
-      var settings = null;
-      results[1].forEach(function (d) { if (d.id === "settings") settings = d; });
+      var settings = results[1];
 
       if (!guests.length && !settings) {
         await seed();
@@ -244,6 +260,7 @@
 
       state.guests = guests;
       if (typeof tpl === "string" && tpl.length) state.template = tpl;
+      state.rev = revOf(settings);
       state.loaded = true;
 
       var sig = JSON.stringify(state.guests) + "|" + state.template;
@@ -261,10 +278,19 @@
     }
   }
 
+  async function poll() {
+    try {
+      if (revOf(await readMeta()) !== state.rev) await loadAll(true);
+    } catch (e) {
+      handleError(e);
+    }
+  }
+
   async function seed() {
     // Создаём meta/settings только если его ещё нет — это защищает от
     // двойного засева, если страницу открыли одновременно с двух устройств.
-    await fsPatch("meta/settings", { template: DEFAULT_TEMPLATE, seeded: true }, { mustNotExist: true });
+    await fsPatch("meta/settings",
+      { template: DEFAULT_TEMPLATE, seeded: true, rev: Date.now() }, { mustNotExist: true });
     for (var i = 0; i < SEED.length; i++) {
       var s = SEED[i];
       await fsPatch("guests/" + newId(), {
@@ -275,15 +301,20 @@
     }
   }
 
-  async function save(fn, optimistic) {
+  async function save(fn) {
     state.pending++;
     setSync("saving", "сохраняем…");
     try {
       await fn();
+      // Если кто-то писал в базу параллельно, сначала забираем его правки:
+      // иначе наш новый rev затрёт его сигнал, и мы их больше не увидим.
+      if (revOf(await readMeta()) !== state.rev) await loadAll(true);
+      var rev = Date.now();
+      await fsPatch("meta/settings", { rev: rev });
+      state.rev = rev;
       state.pending--;
       if (state.pending === 0) setSync("idle", "все сохранено");
-      state.signature = "";
-      await loadAll(true);
+      render(true);
     } catch (e) {
       state.pending--;
       handleError(e);
@@ -621,8 +652,14 @@
       dark.addEventListener("change", function () { render(true); });
     }
 
+    ["pointerdown", "keydown"].forEach(function (ev) {
+      document.addEventListener(ev, function () { lastActivity = Date.now(); }, true);
+    });
+
     document.addEventListener("visibilitychange", function () {
-      if (!document.hidden) loadAll(true);
+      if (document.hidden) return;
+      lastActivity = Date.now();
+      poll();
     });
   }
 
@@ -665,10 +702,15 @@
     setSync("saving", "загружаем…");
     loadAll(false);
 
-    setInterval(function () {
-      if (document.hidden || isEditing() || state.pending > 0) return;
-      loadAll(true);
-    }, 5000);
+    // Пока со страницей работают — опрос раз в 7 с; в простое замедляемся
+    // до 30 с, чтобы вкладка, забытая открытой на сутки, не ела квоту.
+    (function tick() {
+      var active = Date.now() - lastActivity < 120000;
+      setTimeout(function () {
+        if (!document.hidden && !isEditing() && state.pending === 0) poll();
+        tick();
+      }, active ? 7000 : 30000);
+    })();
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
