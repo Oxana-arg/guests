@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ru" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Общий список гостей на 22–24 сентября: статусы, приглашения, заметки.">
+<title>Трекер гостей</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎉</text></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <h1>Трекер гостей</h1>
+    <span class="dates">22–24 сентября</span>
+    <span class="sync" id="sync" data-state="idle"><span class="dot"></span><span id="syncText">загрузка…</span></span>
+  </div>
+
+  <div id="setup" hidden></div>
+
+  <main id="main" hidden>
+
+    <section class="summary" id="summary" aria-label="Сводка"></section>
+
+    <div class="toolbar">
+      <div class="tabs" id="tabs" role="tablist" aria-label="Фильтр по дате"></div>
+      <div class="search">
+        <input id="search" type="search" placeholder="Поиск по имени…" autocomplete="off" aria-label="Поиск по имени">
+      </div>
+      <button class="btn btn--primary" id="addToggle" type="button">+ Добавить гостя</button>
+    </div>
+
+    <form class="addbox" id="addBox" hidden>
+      <h2>Новый гость</h2>
+      <div class="addgrid">
+        <div class="field">
+          <label for="newName">Имя</label>
+          <input id="newName" type="text" required placeholder="Например, Аня" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="newDate">Дата</label>
+          <select id="newDate">
+            <option value="22.09">22.09</option>
+            <option value="23.09">23.09</option>
+            <option value="24.09">24.09</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="newStatus">Статус</label>
+          <select id="newStatus">
+            <option value="pending">❓ Ожидаем ответ</option>
+            <option value="confirmed">✅ Подтвердил</option>
+            <option value="declined">❌ Не придёт</option>
+          </select>
+        </div>
+        <div class="field">
+          <button class="btn btn--primary" type="submit">Добавить</button>
+        </div>
+      </div>
+    </form>
+
+    <div class="card">
+      <div class="thead">
+        <div>Имя</div><div>Дата</div><div>Статус</div><div>Ответственный</div>
+        <div>Отправлено</div><div>Заметки</div><div></div>
+      </div>
+      <div id="rows"><div class="skeleton">Загружаем список…</div></div>
+    </div>
+
+    <section class="section tpl">
+      <h2>Шаблон приглашения</h2>
+      <p class="hint">Используйте <code class="ph">{Имя}</code> и <code class="ph">{Дата}</code> — они подставятся автоматически. Шаблон общий: его видят все.</p>
+      <div class="field">
+        <textarea id="tpl" aria-label="Шаблон приглашения"></textarea>
+      </div>
+      <div class="tplfoot">
+        <button class="btn btn--primary btn--sm" id="tplSave" type="button">Сохранить шаблон</button>
+        <button class="btn btn--sm btn--ghost" id="tplReset" type="button">Вернуть стандартный</button>
+        <span class="note" id="tplNote"></span>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Готовые приглашения</h2>
+      <p class="hint" id="invHint"></p>
+      <div class="invites" id="invites"></div>
+    </section>
+
+  </main>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
